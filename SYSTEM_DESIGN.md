@@ -825,7 +825,7 @@ Thiết kế API theo chuẩn RESTful đầy đủ, phiên bản `/api/v1`:
 
 ## 17. Folder Structure
 
-### 17.1. Cấu trúc thư mục Backend (Spring Boot - Modular Monolith + Clean Architecture)
+### 17.1. Cấu trúc thư mục Backend (Spring Boot - com.quynhontravel.tourism)
 ```text
 l:\tourism
 ├── .gitignore
@@ -835,45 +835,52 @@ l:\tourism
 └── src
     ├── main
     │   ├── java
-    │   │   └── ai_quynhon_tourism_management
-    │   │       └── tourism
-    │   │           ├── TourismApplication.java
-    │   │           ├── common
-    │   │           │   ├── exception           # Global Exception Handler chung
-    │   │           │   ├── response            # Định dạng phản hồi API chuẩn
-    │   │           │   └── security            # Cấu hình Spring Security chung
-    │   │           └── modules
-    │   │               ├── tour                # Module Quản lý Tour
-    │   │               │   ├── domain          # TẦNG DOMAIN: Quy tắc nghiệp vụ lõi
-    │   │               │   │   ├── entity      # Tour, TourCategory, TourSchedule (Java thuần)
-    │   │               │   │   ├── exception   # TourNotFoundException, InvalidPriceException
-    │   │               │   │   └── valueobject # Price, Duration (Value Objects)
-    │   │               │   ├── application     # TẦNG APPLICATION: Logic ứng dụng & Use Cases
-    │   │               │   │   ├── dto         # TourRequest, TourResponse (DTOs)
-    │   │               │   │   ├── mapper      # Lớp chuyển đổi dữ liệu Entity <=> DTO
-    │   │               │   │   ├── port        # Interfaces định nghĩa cổng giao tiếp
-    │   │               │   │   │   ├── input   # Các Use Cases (e.g., GetTourDetailUseCase)
-    │   │               │   │   │   └── output  # Các Port ra ngoài (e.g., TourRepositoryPort)
-    │   │               │   │   └── usecase     # Các Service triển khai Use Case Interfaces
-    │   │               │   └── infrastructure  # TẦNG INFRASTRUCTURE: Chi tiết kỹ thuật & Frameworks
-    │   │               │       ├── adapter     # Các lớp triển khai Output Ports (e.g., DatabaseAdapter)
-    │   │               │       ├── controller  # Các REST Controllers tiếp nhận HTTP requests
-    │   │               │       ├── entity      # TourJpaEntity, ScheduleJpaEntity (Hibernate mapping)
-    │   │               │       └── repository  # Spring Data JPA Interfaces truy vấn PostgreSQL
+    │   │   └── com
+    │   │       └── quynhontravel
+    │   │           └── tourism
+    │   │               ├── TourismApplication.java
     │   │               │
-    │   │               ├── booking             # Module Đặt chỗ (Cấu trúc tương tự)
-    │   │               ├── payment             # Module Thanh toán VNPay
-    │   │               ├── review              # Module Đánh giá và AI Sentiment Analyzer
-    │   │               ├── notification        # Module Thông báo (Email, Event Listeners)
-    │   │               └── ai                  # Module Gemini AI Integration
+    │   │               ├── common              # Các thành phần dùng chung hệ thống
+    │   │               │   ├── config          # Cấu hình Spring Boot (Security, Redis, Mail)
+    │   │               │   ├── security        # Cấu hình JWT & Phân quyền bảo mật
+    │   │               │   ├── exception       # Global Exception Handler và các Custom Exceptions
+    │   │               │   ├── response        # Chuẩn hóa dữ liệu API Response phản hồi
+    │   │               │   ├── constants       # Định nghĩa các hằng số hệ thống
+    │   │               │   ├── enums           # Các Enum dùng chung (UserRole, BookingStatus, ...)
+    │   │               │   ├── utils           # Các class tiện ích (JwtUtils, DateUtils, ...)
+    │   │               │   ├── validator       # Custom annotation validators
+    │   │               │   └── mapper          # Cấu hình mapper toàn cục (ModelMapper / MapStruct)
+    │   │               │
+    │   │               ├── modules             # Các mô-đun nghiệp vụ chính
+    │   │               │   ├── auth            # Mô-đun Xác thực (Email OTP & Login)
+    │   │               │   ├── user            # Mô-đun Quản lý Người dùng
+    │   │               │   ├── role            # Mô-đun Quản lý Phân quyền
+    │   │               │   ├── tour            # Mô-đun Quản lý Tour & Lịch trình (Schedules)
+    │   │               │   ├── booking         # Mô-đun Đặt chỗ (Booking)
+    │   │               │   ├── payment         # Mô-đun Thanh toán trực tuyến (VNPay)
+    │   │               │   ├── review          # Mô-đun Đánh giá & AI Sentiment Analyzer
+    │   │               │   ├── guide           # Mô-đun Quản lý Hướng dẫn viên du lịch
+    │   │               │   ├── loyalty         # Mô-đun Khách hàng thân thiết & Điểm thưởng
+    │   │               │   ├── notification    # Mô-đun Quản lý Thông báo
+    │   │               │   └── ai              # Mô-đun AI Travel Planner & Chatbot
+    │   │               │
+    │   │               ├── integration         # Tích hợp dịch vụ bên thứ ba
+    │   │               │   ├── gemini          # Gemini API Integration Client
+    │   │               │   ├── vnpay           # VNPay API Client & Callback handler
+    │   │               │   ├── cloudinary      # Cloudinary Upload API Client
+    │   │               │   └── email           # Spring Mail Sender Service
+    │   │               │
+    │   │               └── scheduler           # Các Job chạy tự động theo lịch (Cron jobs)
+    │   │
     │   └── resources
     │       ├── application.yaml             # Cấu hình môi trường dev/prod
     │       └── templates
     │           └── mail                     # File template email gửi OTP, hóa đơn
     └── test
         └── java
-            └── ai_quynhon_tourism_management
-                └── tourism                  # Chứa toàn bộ Integration Tests & Unit Tests
+            └── com
+                └── quynhontravel
+                    └── tourism              # Chứa toàn bộ Integration Tests & Unit Tests
 ```
 
 ### 17.2. Cấu trúc thư mục Frontend (Next.js 15)
