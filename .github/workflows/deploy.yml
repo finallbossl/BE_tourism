@@ -7,6 +7,32 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    
+    # Khởi chạy PostgreSQL và Redis làm dịch vụ sidecar cho môi trường chạy thử nghiệm (Integration Tests)
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: tourism
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 28122003
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout mã nguồn
       uses: actions/checkout@v3
@@ -23,6 +49,9 @@ jobs:
 
     - name: Biên dịch và chạy Unit Tests
       run: ./gradlew build --no-daemon
+      env:
+        APP_GEMINI_API_KEY: mock_api_key_for_testing
+        APP_JWT_SECRET: 9a4f2c8d3b7a1e5f8g9h0j2k4l6m8n0o1p3q5r7s9t8u2v4w6x8y0z1a3b5c7d9e
 
   deploy:
     needs: test-and-build
