@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: tourism
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tourism
+    username: postgres
+    password: 28122003
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: your-email@gmail.com
+    password: your-app-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# Cấu hình tham số bảo mật và các dịch vụ tích hợp bên thứ ba
+app:
+  jwt:
+    # Key HMAC-SHA256 tối thiểu 256-bit (32 bytes) dạng Hex để ký mã hóa token
+    secret: 9a4f2c8d3b7a1e5f8g9h0j2k4l6m8n0o1p3q5r7s9t8u2v4w6x8y0z1a3b5c7d9e
+    expiration-ms: 900000 # 15 phút (Access Token)
+    refresh-expiration-ms: 604800000 # 7 ngày (Refresh Token)
+  
+  gemini:
+    api-key: your-gemini-api-key
+    api-url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+
+  vnpay:
+    tmn-code: your-vnpay-tmn-code
+    hash-secret: your-vnpay-hash-secret
+    pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+    return-url: http://localhost:3000/booking/payment-callback

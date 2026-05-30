@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AI-POWERED QUY NHON TOURISM MANAGEMENT SYSTEM
 -- DATABASE INITIALIZATION SCRIPT (POSTGRESQL)
--- VERSION: 1.1 (Optimized with Audit Logs & Soft Deletes)
+-- VERSION: 1.2 (Added Wishlists & Reported Reviews)
 -- ============================================================================
 
 -- Kích hoạt extension sinh mã UUID ngẫu nhiên
@@ -10,6 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Hủy các bảng cũ nếu đã tồn tại để tránh xung đột
 DROP TABLE IF EXISTS ai_dynamic_pricing_logs CASCADE;
 DROP TABLE IF EXISTS ai_travel_plans CASCADE;
+DROP TABLE IF EXISTS wishlists CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS bookings CASCADE;
@@ -149,7 +150,7 @@ CREATE TABLE payments (
 );
 
 -- ============================================================================
--- 4. MODULE: AI INTERACTIONS & ANALYTICS
+-- 4. MODULE: REVIEWS & WISHLISTS
 -- ============================================================================
 
 -- Bảng: reviews
@@ -160,6 +161,7 @@ CREATE TABLE reviews (
     rating INT NOT NULL,
     comment TEXT,
     ai_sentiment VARCHAR(20),
+    is_reported BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_reviews_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -167,6 +169,21 @@ CREATE TABLE reviews (
     CONSTRAINT chk_rating_range CHECK (rating BETWEEN 1 AND 5),
     CONSTRAINT chk_ai_sentiment CHECK (ai_sentiment IN ('POSITIVE', 'NEUTRAL', 'NEGATIVE'))
 );
+
+-- Bảng: wishlists (Lưu tour yêu thích)
+CREATE TABLE wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL,
+    tour_id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_wishlists_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_wishlists_tour FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE,
+    CONSTRAINT uq_customer_tour UNIQUE (customer_id, tour_id)
+);
+
+-- ============================================================================
+-- 5. MODULE: AI INTERACTIONS & ANALYTICS
+-- ============================================================================
 
 -- Bảng: ai_travel_plans
 CREATE TABLE ai_travel_plans (
@@ -196,7 +213,7 @@ CREATE TABLE ai_dynamic_pricing_logs (
 );
 
 -- ============================================================================
--- 5. PERFORMANCE INDEXES (TỐI ƯU HÓA TRUY VẤN TỐC ĐỘ CAO)
+-- 6. PERFORMANCE INDEXES (TỐI ƯU HÓA TRUY VẤN TỐC ĐỘ CAO)
 -- ============================================================================
 
 -- Tối ưu cho trang chủ và các trang tìm kiếm, tối ưu cấu trúc SEO URL (Slug)
@@ -211,11 +228,14 @@ CREATE INDEX idx_bookings_customer ON bookings(customer_id);
 -- Tối ưu hóa cổng thanh toán khi cổng VNPAY gọi webhook đối soát IPN đồng thời
 CREATE INDEX idx_payments_vnp_ref ON payments(vnp_txn_ref);
 
+-- Tối ưu cho việc tải danh sách tour yêu thích (Wishlist) của khách hàng
+CREATE INDEX idx_wishlists_customer ON wishlists(customer_id);
+
 -- Chỉ mục nâng cao GIN phục vụ việc phân tích và tìm kiếm từ khóa bên trong cấu trúc JSONB của AI Planner
-CREATE INDEX idx_ai_plans_jsonb ON ai_travel_plans USING gin (ai_response_json);
+CREATE INDEX idx_ai_plans_jsonb ON ai_travel_plans USING GIN (ai_response_json);
 
 -- ============================================================================
--- 6. AUTOMATED AUDIT TRIGGERS (TỰ ĐỘNG CẬP NHẬT TRƯỜNG UPDATED_AT)
+-- 7. AUTOMATED AUDIT TRIGGERS (TỰ ĐỘNG CẬP NHẬT TRƯỜNG UPDATED_AT)
 -- ============================================================================
 
 -- Tạo hàm xử lý tự động cập nhật trường `updated_at`
