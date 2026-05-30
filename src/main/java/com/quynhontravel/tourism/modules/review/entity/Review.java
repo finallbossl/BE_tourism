@@ -39,6 +39,9 @@ public class Review {
     @Column(name = "ai_sentiment", length = 20)
     private SentimentType aiSentiment;
 
+    @Column(name = "is_reported")
+    private Boolean isReported;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -47,3 +50,4 @@ public class Review {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 }
+
