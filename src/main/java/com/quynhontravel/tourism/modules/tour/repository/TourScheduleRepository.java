@@ -15,6 +15,8 @@ import java.util.UUID;
 
 @Repository
 public interface TourScheduleRepository extends JpaRepository<TourSchedule, UUID> {
+
+    List<TourSchedule> findAllByTourId(UUID tourId);
     
     List<TourSchedule> findAllByTourIdAndStatus(UUID tourId, TourScheduleStatus status);
     

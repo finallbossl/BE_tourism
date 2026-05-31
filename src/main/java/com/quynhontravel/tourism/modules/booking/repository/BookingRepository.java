@@ -11,4 +11,10 @@ import java.util.UUID;
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
     
     List<Booking> findAllByCustomerIdOrderByCreatedAtDesc(UUID customerId);
+
+    boolean existsByCustomerIdAndScheduleIdInAndStatus(
+            UUID customerId, 
+            List<UUID> scheduleIds, 
+            com.quynhontravel.tourism.common.enums.BookingStatus status
+    );
 }
