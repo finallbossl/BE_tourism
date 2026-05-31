@@ -6,6 +6,7 @@ import com.quynhontravel.tourism.common.enums.UserRole;
 import com.quynhontravel.tourism.modules.booking.entity.Booking;
 import com.quynhontravel.tourism.modules.booking.repository.BookingRepository;
 import com.quynhontravel.tourism.modules.payment.entity.Payment;
+import com.quynhontravel.tourism.modules.notification.service.NotificationService;
 import com.quynhontravel.tourism.modules.payment.repository.PaymentRepository;
 import com.quynhontravel.tourism.modules.user.entity.User;
 import com.quynhontravel.tourism.modules.user.repository.UserRepository;
@@ -33,6 +34,7 @@ public class VNPayService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Value("${app.vnpay.tmn-code}")
     private String vnpTmnCode;
@@ -207,6 +209,9 @@ public class VNPayService {
                 userRepository.save(user);
                 log.info("Cộng {} điểm tích lũy thành công cho khách hàng {}", earnedPoints, user.getEmail());
             }
+
+            // Gửi email xác nhận đặt tour kèm QR Code
+            notificationService.sendBookingConfirmationEmail(bookingId);
 
             log.info("Xử lý thanh toán thành công IPN cho Booking ID: {}", bookingId);
             return "{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}";
