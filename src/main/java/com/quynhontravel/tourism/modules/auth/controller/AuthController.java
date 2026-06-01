@@ -4,16 +4,16 @@ import com.quynhontravel.tourism.common.response.ApiResponse;
 import com.quynhontravel.tourism.modules.auth.dto.AuthResponse;
 import com.quynhontravel.tourism.modules.auth.dto.RequestOtpRequest;
 import com.quynhontravel.tourism.modules.auth.dto.VerifyOtpRequest;
+import com.quynhontravel.tourism.common.exception.BusinessException;
+import com.quynhontravel.tourism.modules.auth.dto.TokenRefreshResponse;
 import com.quynhontravel.tourism.modules.auth.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -51,5 +51,36 @@ public class AuthController {
         response.addCookie(refreshTokenCookie);
         
         return ResponseEntity.ok(ApiResponse.success(result.getAuthResponse(), "Đăng nhập thành công!"));
+    }
+
+    /**
+     * API làm mới Access Token từ Refresh Token (lấy từ HttpOnly Cookie)
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenRefreshResponse>> refreshToken(
+            @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException("Thiếu Refresh Token", HttpStatus.UNAUTHORIZED);
+        }
+        
+        TokenRefreshResponse tokenResponse = authService.refreshToken(refreshToken);
+        return ResponseEntity.ok(ApiResponse.success(tokenResponse, "Làm mới Access Token thành công!"));
+    }
+
+    /**
+     * API đăng xuất (Xóa HttpOnly Cookie của Refresh Token)
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
+        Cookie cookie = new Cookie("refresh_token", null);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0); // Xóa ngay lập tức
+        cookie.setAttribute("SameSite", "Strict");
+        response.addCookie(cookie);
+        
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công!"));
     }
 }

@@ -8,10 +8,16 @@ import com.quynhontravel.tourism.modules.auth.dto.VerifyOtpRequest;
 import com.quynhontravel.tourism.modules.user.entity.User;
 import com.quynhontravel.tourism.modules.user.repository.UserRepository;
 import com.quynhontravel.tourism.common.utils.JwtUtils;
+import com.quynhontravel.tourism.modules.auth.dto.TokenRefreshResponse;
+import com.quynhontravel.tourism.common.exception.BusinessException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +29,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final OtpService otpService;
     private final JwtUtils jwtUtils;
+    private final JwtDecoder jwtDecoder;
 
     /**
      * Yêu cầu mã OTP cho email. Nếu chưa đăng ký, tự động tạo mới tài khoản (Passwordless Registration).
@@ -77,6 +84,41 @@ public class AuthService {
                 .build();
                 
         return new AuthResponseAndCookie(authResponse, refreshToken);
+    }
+
+    /**
+     * Xác thực Refresh Token và cấp Access Token mới
+     */
+    @Transactional(readOnly = true)
+    public TokenRefreshResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException("Thiếu Refresh Token", HttpStatus.UNAUTHORIZED);
+        }
+
+        try {
+            Jwt jwt = jwtDecoder.decode(refreshToken);
+            String email = jwt.getSubject();
+
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new BusinessException(
+                            "Không tìm thấy người dùng phù hợp với Refresh Token", 
+                            HttpStatus.UNAUTHORIZED
+                    ));
+
+            if (Boolean.FALSE.equals(user.getIsActive())) {
+                throw new BusinessException("Tài khoản của bạn đã bị khóa", HttpStatus.UNAUTHORIZED);
+            }
+
+            String newAccessToken = jwtUtils.generateAccessToken(user);
+
+            return TokenRefreshResponse.builder()
+                    .accessToken(newAccessToken)
+                    .build();
+
+        } catch (JwtException e) {
+            log.warn("Refresh Token không hợp lệ hoặc đã hết hạn: {}", e.getMessage());
+            throw new BusinessException("Refresh Token không hợp lệ hoặc đã hết hạn", HttpStatus.UNAUTHORIZED);
+        }
     }
     
     @Getter
