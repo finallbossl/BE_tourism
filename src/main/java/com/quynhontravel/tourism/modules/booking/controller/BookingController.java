@@ -2,6 +2,8 @@ package com.quynhontravel.tourism.modules.booking.controller;
 
 import com.quynhontravel.tourism.common.response.ApiResponse;
 import com.quynhontravel.tourism.modules.booking.dto.BookingResponse;
+import com.quynhontravel.tourism.modules.booking.dto.CalculateDiscountRequest;
+import com.quynhontravel.tourism.modules.booking.dto.CalculateDiscountResponse;
 import com.quynhontravel.tourism.modules.booking.dto.CreateBookingRequest;
 import com.quynhontravel.tourism.modules.booking.service.BookingService;
 import jakarta.validation.Valid;
@@ -42,5 +44,18 @@ public class BookingController {
         UUID customerId = UUID.fromString(jwt.getClaimAsString("userId"));
         List<BookingResponse> history = bookingService.getMyHistory(customerId);
         return ResponseEntity.ok(ApiResponse.success(history, "Lấy lịch sử đặt chỗ thành công."));
+    }
+
+    /**
+     * API tính toán trước số tiền giảm trừ thực tế khi áp dụng điểm tích lũy
+     */
+    @PostMapping("/calculate-discount")
+    public ResponseEntity<ApiResponse<CalculateDiscountResponse>> calculateDiscount(
+            @Valid @RequestBody CalculateDiscountRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        
+        UUID customerId = UUID.fromString(jwt.getClaimAsString("userId"));
+        CalculateDiscountResponse response = bookingService.calculateDiscount(request, customerId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Tính toán giảm giá thành công."));
     }
 }

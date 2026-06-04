@@ -3,6 +3,8 @@ package com.quynhontravel.tourism.modules.booking.service;
 import com.quynhontravel.tourism.common.enums.BookingStatus;
 import com.quynhontravel.tourism.common.enums.TourScheduleStatus;
 import com.quynhontravel.tourism.modules.booking.dto.BookingResponse;
+import com.quynhontravel.tourism.modules.booking.dto.CalculateDiscountRequest;
+import com.quynhontravel.tourism.modules.booking.dto.CalculateDiscountResponse;
 import com.quynhontravel.tourism.modules.booking.dto.CreateBookingRequest;
 import com.quynhontravel.tourism.modules.booking.entity.Booking;
 import com.quynhontravel.tourism.modules.booking.repository.BookingRepository;
@@ -118,6 +120,43 @@ public class BookingService {
                 .status(booking.getStatus().name())
                 .checkInAt(booking.getCheckInAt())
                 .createdAt(booking.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * Tính toán trước số tiền giảm trừ thực tế khi áp dụng điểm tích lũy
+     */
+    @Transactional(readOnly = true)
+    public CalculateDiscountResponse calculateDiscount(CalculateDiscountRequest request, UUID customerId) {
+        User user = userRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng."));
+
+        TourSchedule schedule = tourScheduleRepository.findById(request.getScheduleId())
+                .orElseThrow(() -> new RuntimeException("Lịch trình khởi hành không tồn tại."));
+
+        int totalSeatsRequested = request.getQuantityAdults() + request.getQuantityChildren();
+        BigDecimal seatPrice = schedule.getCurrentPrice();
+        BigDecimal totalRawPrice = seatPrice.multiply(BigDecimal.valueOf(totalSeatsRequested));
+
+        int pointsToUse = request.getPointsUsed() != null ? request.getPointsUsed() : 0;
+        if (pointsToUse > 0 && user.getLoyaltyPoints() < pointsToUse) {
+            throw new RuntimeException("Tài khoản không đủ điểm tích lũy để thực hiện giảm giá.");
+        }
+
+        BigDecimal discount = BigDecimal.valueOf(pointsToUse).multiply(BigDecimal.valueOf(1000));
+        BigDecimal finalPrice = totalRawPrice.subtract(discount);
+        if (finalPrice.compareTo(BigDecimal.ZERO) < 0) {
+            finalPrice = BigDecimal.ZERO;
+        }
+
+        int remainingPoints = (user.getLoyaltyPoints() != null ? user.getLoyaltyPoints() : 0) - pointsToUse;
+
+        return CalculateDiscountResponse.builder()
+                .totalRawPrice(totalRawPrice)
+                .discountAmount(discount)
+                .finalPrice(finalPrice)
+                .pointsUsed(pointsToUse)
+                .pointsBalance(remainingPoints)
                 .build();
     }
 }
