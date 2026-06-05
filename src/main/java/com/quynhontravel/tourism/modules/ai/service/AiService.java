@@ -9,7 +9,9 @@ import com.quynhontravel.tourism.modules.ai.repository.AiDynamicPricingLogReposi
 import com.quynhontravel.tourism.modules.ai.repository.AiTravelPlanRepository;
 import com.quynhontravel.tourism.modules.review.entity.Review;
 import com.quynhontravel.tourism.modules.review.repository.ReviewRepository;
+import com.quynhontravel.tourism.modules.tour.entity.Tour;
 import com.quynhontravel.tourism.modules.tour.entity.TourSchedule;
+import com.quynhontravel.tourism.modules.tour.repository.TourRepository;
 import com.quynhontravel.tourism.modules.tour.repository.TourScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,9 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +40,11 @@ public class AiService {
     private final AiDynamicPricingLogRepository aiDynamicPricingLogRepository;
     private final ReviewRepository reviewRepository;
     private final TourScheduleRepository tourScheduleRepository;
+    private final TourRepository tourRepository;
     private final ObjectMapper objectMapper;
+
+    // Cache để lưu trữ embedding của các tour, tránh tạo lại nhiều lần gây tốn token và tăng độ trễ
+    private final Map<UUID, List<Double>> tourEmbeddingCache = new ConcurrentHashMap<>();
 
     /**
      * Tạo lịch trình du lịch thông minh bằng AI (Có lưu cache trên Redis qua @Cacheable)
@@ -84,7 +93,7 @@ public class AiService {
     }
 
     /**
-     * Tư vấn du lịch Quy Nhơn trực tuyến qua Trợ lý ảo Chatbot
+     * Tư vấn du lịch Quy Nhơn trực tuyến qua Trợ lý ảo Chatbot (Sử dụng RAG / Tìm kiếm ngữ nghĩa bằng Gemini Embedding 1)
      */
     public String chat(String message) {
         String systemInstruction = 
@@ -93,8 +102,93 @@ public class AiService {
                 "ẩm thực đặc sản (bánh hỏi lòng heo, chả cá, tré, bánh xèo tôm nhảy), thời tiết và tư vấn các tour Quy Nhơn phù hợp.\n" +
                 "Hãy luôn trả lời bằng tiếng Việt, giọng điệu thân thiện, mến khách và chuyên nghiệp. Không trả lời câu hỏi không liên quan đến du lịch hoặc Quy Nhơn.\n";
 
-        String prompt = systemInstruction + "\nCâu hỏi khách hàng: " + message;
+        // Tìm kiếm các tour liên quan ngữ nghĩa bằng Gemini Embedding 1 (RAG)
+        String tourContext = retrieveRelevantToursContext(message);
+
+        String prompt = systemInstruction + tourContext + "\nCâu hỏi khách hàng: " + message;
         return geminiService.generateContent(prompt, false);
+    }
+
+    /**
+     * Tìm kiếm ngữ nghĩa các tour du lịch liên quan đến tin nhắn của khách hàng
+     */
+    private String retrieveRelevantToursContext(String message) {
+        try {
+            log.info("Đang tạo embedding truy vấn cho chatbot bằng gemini-embedding-001...");
+            List<Double> queryEmbedding = geminiService.getEmbedding(message);
+            List<Tour> tours = tourRepository.findAllByIsDeletedFalse();
+            
+            List<Map.Entry<Tour, Double>> matches = new ArrayList<>();
+            for (Tour tour : tours) {
+                List<Double> tourEmbedding = getCachedTourEmbedding(tour);
+                if (tourEmbedding != null) {
+                    double similarity = calculateCosineSimilarity(queryEmbedding, tourEmbedding);
+                    // Ngưỡng lọc độ tương đồng tối thiểu
+                    if (similarity >= 0.35) {
+                        matches.add(new AbstractMap.SimpleEntry<>(tour, similarity));
+                    }
+                }
+            }
+            
+            // Sắp xếp các tour phù hợp nhất lên đầu
+            matches.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+            
+            if (matches.isEmpty()) {
+                return "";
+            }
+            
+            // Lấy tối đa 2 tour liên quan nhất cung cấp làm ngữ cảnh cho LLM
+            StringBuilder context = new StringBuilder("\n[Ngữ cảnh hệ thống: Các tour du lịch Quy Nhơn liên quan được tìm thấy bằng AI (Gemini Embedding)]:\n");
+            int count = 0;
+            for (Map.Entry<Tour, Double> entry : matches) {
+                Tour t = entry.getKey();
+                context.append(String.format("- Tour: %s\n  Mô tả: %s\n  Giá gốc: %,.0f VNĐ\n  Thời gian: %d ngày %d đêm\n", 
+                        t.getTitle(), t.getDescription(), t.getBasePrice(), t.getDurationDays(), t.getDurationNights()));
+                count++;
+                if (count >= 2) break;
+            }
+            return context.toString();
+        } catch (Exception e) {
+            log.warn("Lỗi khi tìm kiếm ngữ cảnh tour (RAG): {}. Trả lời mà không có ngữ cảnh.", e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * Tạo hoặc lấy từ cache vector embedding của tour du lịch
+     */
+    private List<Double> getCachedTourEmbedding(Tour tour) {
+        return tourEmbeddingCache.computeIfAbsent(tour.getId(), id -> {
+            String tourText = "Tour: " + tour.getTitle() + ". Mô tả: " + tour.getDescription();
+            try {
+                log.info("Tạo embedding mới cho tour: {}", tour.getTitle());
+                return geminiService.getEmbedding(tourText);
+            } catch (Exception e) {
+                log.warn("Không thể tạo embedding cho tour: {}. Lỗi: {}", tour.getTitle(), e.getMessage());
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Tính toán độ tương đồng Cosine giữa 2 vector embedding
+     */
+    private double calculateCosineSimilarity(List<Double> vectorA, List<Double> vectorB) {
+        if (vectorA == null || vectorB == null || vectorA.size() != vectorB.size()) {
+            return 0.0;
+        }
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < vectorA.size(); i++) {
+            dotProduct += vectorA.get(i) * vectorB.get(i);
+            normA += Math.pow(vectorA.get(i), 2);
+            normB += Math.pow(vectorB.get(i), 2);
+        }
+        if (normA == 0.0 || normB == 0.0) {
+            return 0.0;
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
     /**

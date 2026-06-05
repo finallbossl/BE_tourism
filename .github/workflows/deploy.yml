@@ -42,13 +42,13 @@ jobs:
       with:
         java-version: '24'
         distribution: 'temurin'
-        cache: gradle
+        cache: maven
 
-    - name: Cấp quyền thực thi cho gradlew
-      run: chmod +x gradlew
+    - name: Cấp quyền thực thi cho mvnw
+      run: chmod +x mvnw
 
     - name: Biên dịch và chạy Unit Tests
-      run: ./gradlew build --no-daemon
+      run: ./mvnw clean package
       env:
         APP_GEMINI_API_KEY: mock_api_key_for_testing
         APP_JWT_SECRET: 9a4f2c8d3b7a1e5f8g9h0j2k4l6m8n0o1p3q5r7s9t8u2v4w6x8y0z1a3b5c7d9e

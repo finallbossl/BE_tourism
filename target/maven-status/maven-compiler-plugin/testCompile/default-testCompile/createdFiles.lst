@@ -1,0 +1,6 @@
+com\quynhontravel\tourism\modules\booking\BookingServiceTest.class
+com\quynhontravel\tourism\TourismApplicationTests.class
+com\quynhontravel\tourism\modules\payment\VNPayServiceTest.class
+com\quynhontravel\tourism\modules\review\ReviewServiceTest.class
+com\quynhontravel\tourism\modules\loyalty\LoyaltyServiceTest.class
+com\quynhontravel\tourism\modules\wishlist\WishlistServiceTest.class
